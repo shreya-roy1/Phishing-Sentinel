@@ -17,3 +17,6 @@ dist/
 build/
 *.pth
 *.h5
+
+#setup script
+.sh
