@@ -26,15 +26,28 @@ const Login = () => {
       if (response.ok) {
         localStorage.setItem('sentinel_token', data.token);
 
-        if (window.chrome && chrome.storage) {
-            chrome.storage.local.set({ sentinel_token: data.token });
-        }
+    // Get your Extension ID from chrome://extensions
+    const SENTINEL_EXT_ID = "jlhddlkhohfggefbglbheonnaclgipei";// "YOUR_EXTENSION_ID_HERE"; 
+
+    if (window.chrome && chrome.runtime) {
+        chrome.runtime.sendMessage(SENTINEL_EXT_ID, {
+            type: "SYNC_TOKEN",
+            token: data.token
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.warn("Extension not found or not linked.");
+            } else {
+                console.log("Token successfully handed to extension.");
+            }
+        });
+    }
         
         navigate('/dashboard');
       } else {
         setError(data.error || 'Invalid credentials');
       }
     } catch (err) {
+      //console.error("Login Error:", err);
       setError('Sentinel Server is offline. Ensure Go is running on :8080');
     } finally {
       setLoading(false);
