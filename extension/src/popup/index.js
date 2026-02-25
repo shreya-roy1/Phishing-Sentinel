@@ -1,12 +1,19 @@
 const API_BASE = "http://localhost:8080";
 
 async function updatePopupStats() {
+  const tokenObj = await chrome.storage.local.get(['sentinel_token']);
+  const token = tokenObj.sentinel_token;
+
   const statusEl = document.getElementById('conn-status');
   const scannedEl = document.getElementById('scanned-count');
   const trustEl = document.getElementById('trust-score');
 
   try {
-    const response = await fetch(`${API_BASE}/stats`);
+    const response = await fetch(`${API_BASE}/api/stats`, {
+        headers: {
+            'Authorization': `Bearer ${token}` // ✅ Added JWT
+        }
+    });
     if (!response.ok) throw new Error();
 
     const data = await response.json();
