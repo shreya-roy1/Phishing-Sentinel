@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard/Dashboard.jsx';
 import Login from './pages/Login/Login.jsx';
-import Register from './pages/Login/Register.jsx'; // Adjust path accordingly
+import Register from './pages/Login/Register.jsx';
 
 // Wrapper for protected content
 const ProtectedRoute = ({ children }) => {
