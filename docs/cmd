@@ -1,20 +1,109 @@
-1. **ML Service (Python):**
-cd ml-service && python -m venv venv
-venv\Scripts\activate && pip install -r requirements.txt
-python src/main.py
+# 🚀 Phishing Sentinel – Setup Guide
 
-2.  **API (Golang):**
-The dependencies will auto-download on the first run, or you can run:
-```bash```
-cd api 
+This guide will help you set up all components of the project:
+
+- 🧠 ML Service (Python)
+- 🔗 API (Golang)
+- 🌐 Dashboard (React.js)
+- 🧩 Chrome Extension
+
+---
+
+## 1️⃣ ML Service (Python)
+
+The backend intelligence layer for URL and content analysis.
+
+```bash
+cd ml-service
+
+# Create virtual environment (Windows/Mac/Linux)
+python -m venv venv
+
+# Activate Environment
+# Windows:
+venv\Scripts\activate
+
+# Mac/Linux:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the model
+python src/main.py
+```
+
+---
+
+## 2️⃣ API (Golang)
+
+The central hub connecting the extension, dashboard, and ML service.
+
+```bash
+cd api
+
+# Setup Environment Variables
+# Windows:
+copy .env.example .env
+
+# Mac/Linux:
+cp .env.example .env
+
+# Sync dependencies
 go mod tidy
 
-3.  **Dashboard & Extension (Node.js):**
-```bash```
-    # For the Web Dashboard
-    cd dashboard
-    npm install
+# Run the service
+cd cmd
+go run .
+```
 
-    # For the Browser Extension
-    cd extension
-    npm install
+---
+
+## 3️⃣ Dashboard (React.js)
+
+The web interface for managing your Sentinel account and history.
+
+```bash
+cd dashboard
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+---
+
+## 4️⃣ Chrome Extension Setup
+
+1. Open Chrome and go to:
+
+```
+chrome://extensions/
+```
+
+2. Toggle **Developer Mode** ON (top right).
+3. Click **Load unpacked**.
+4. Select the `Phishing-Sentinel/extension` folder from this project.
+
+---
+
+## ✅ Recommended Startup Order
+
+1. Start **ML Service**
+2. Start **API**
+3. Start **Dashboard**
+4. Load **Chrome Extension**
+
+---
+
+## 📌 Notes
+
+- Ensure Python, Go, and Node.js are installed.
+- Make sure environment variables are properly configured in `.env`.
+- Use separate terminals for each service.
+
+---
+
+🎯 You're now ready to run **Phishing Sentinel** locally!
