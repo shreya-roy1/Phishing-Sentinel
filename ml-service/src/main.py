@@ -1,83 +1,75 @@
-import torch
-import torch.nn as nn
-import joblib
-import os
-import uvicorn
-import numpy as np
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from preprocess import URLExtractor
-from train import PhishingSentinelModel
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+import joblib
+import pandas as pd
+import tempfile
+import os
+from preprocess import extract_url_features, extract_dom_features
 
-app = FastAPI(title="Sentinel Intelligence API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(title="Phishing Sentinel API")
 
-MODEL = None
-SCALER = None
-EXTRACTOR = URLExtractor()
+# Allow your browser extension to communicate with this API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-def load_assets():
-    global MODEL, SCALER
-    try:
-        # Check current working directory to find models folder
-        base_path = os.path.dirname(os.path.abspath(__file__))
-        models_dir = os.path.join(os.path.dirname(base_path), "models")
-        
-        m_path = os.path.join(models_dir, "sentinel_v1.pth")
-        s_path = os.path.join(models_dir, "scaler.pkl")
-        
-        SCALER = joblib.load(s_path)
-        MODEL = PhishingSentinelModel(input_size=41)
-        # map_location ensures it works on CPU even if trained on GPU
-        MODEL.load_state_dict(torch.load(m_path, map_location=torch.device('cpu')))
-        MODEL.eval()
-        print("[Sentinel] Model and Scaler loaded successfully.")
-    except Exception as e:
-        print(f"[Sentinel] Error loading assets: {e}")
+# Load the model on startup
+print("Loading Phishing Sentinel model...")
+model = joblib.load('../models/phishing_sentinel_model.pkl')
+print("Model loaded successfully!")
 
-class AnalysisRequest(BaseModel):
+# Define the expected JSON payload
+class AnalyzePayload(BaseModel):
     url: str
-    dom_content: str = ""
-
-@app.on_event("startup")
-async def startup_event():
-    load_assets()
+    html: str
 
 @app.post("/analyze")
-async def analyze(request: AnalysisRequest):
-    if MODEL is None or SCALER is None:
-        raise HTTPException(status_code=500, detail="Assets not loaded")
-
-    # 1. Extract raw features
-    raw_features = EXTRACTOR.extract_features(request.url)
+async def analyze_page(payload: AnalyzePayload):
+    if not payload.url or not payload.html:
+        raise HTTPException(status_code=400, detail="Missing URL or HTML content")
+        
+    url = payload.url
+    html_content = payload.html
     
-    # 2. Scale Features
-    # If this isn't working, the model receives massive numbers and outputs 1.0
-    features_scaled = SCALER.transform(raw_features)
+    # 1. Extract URL features
+    url_feats = extract_url_features(url)
     
-    # DEBUG: See the first 5 scaled features in terminal
-    print(f"Scaled Sample: {features_scaled[0][:5]}")
-
-    features_tensor = torch.FloatTensor(features_scaled)
-
-    # 3. Predict
-    with torch.no_grad():
-        output = MODEL(features_tensor)
-        confidence = output.item()
+    # 2. Extract DOM features
+    with tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8') as temp_file:
+        temp_file.write(html_content)
+        temp_path = temp_file.name
+        
+    dom_feats = extract_dom_features(temp_path, url)
+    os.remove(temp_path) 
     
-    print(f"URL: {request.url} | AI Score: {confidence:.4f}")
-
-    # Increase threshold to 0.8 for higher precision
-    is_spoof = confidence > 0.8 
-    threat_level = "high" if confidence > 0.95 else "medium" if is_spoof else "low"
+    # 3. Combine and format
+    combined_features = {**url_feats, **dom_feats}
+    
+    feature_order = [
+        'url_length', 'has_ip', 'has_at_symbol', 'num_hyphens', 'num_subdomains',
+        'has_password_field', 'has_hidden_iframe', 'suspicious_form_action', 'script_to_content_ratio'
+    ]
+    
+    df_features = pd.DataFrame([combined_features], columns=feature_order)
+    
+    # 4. Predict
+    prediction = model.predict(df_features)[0]
+    probability = model.predict_proba(df_features)[0][1] 
+    
+    result = "Phishing" if prediction == 1 else "Legitimate"
     
     return {
-        "is_spoof": is_spoof,
-        "confidence_score": confidence,
-        "threat_level": threat_level,
-        "detected_anomalies": ["Lexical Pattern Anomaly"] if is_spoof else []
+        "verdict": result,
+        "phishing_probability": round(probability * 100, 2),
+        "analyzed_features": combined_features
     }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Binds to 0.0.0.0:8000
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

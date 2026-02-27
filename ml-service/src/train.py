@@ -1,96 +1,70 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
 import pandas as pd
-import numpy as np
-import os
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, accuracy_score
 import joblib
+import time
 
-class PhishingSentinelModel(nn.Module):
-    def __init__(self, input_size):
-        super(PhishingSentinelModel, self).__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_size, 64),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 1),
-            nn.Sigmoid()
-        )
-        
-    def forward(self, x):
-        return self.network(x)
+start_time = time.time()
 
-def train_model(csv_path="Dataset.csv"):
-    if not os.path.exists(csv_path):
-        # Check in datasets subfolder if not in root
-        csv_path = os.path.join("datasets", "Dataset.csv")
-        if not os.path.exists(csv_path):
-            print(f"Error: {csv_path} not found.")
-            return
+# Old Colab paths
+features_csv_path = '/content/drive/MyDrive/Phishing_Data/extracted_features.csv'
+model_save_path = '/content/drive/MyDrive/Phishing_Data/phishing_sentinel_model.pkl'
 
-    print(f"[Sentinel] Loading Dataset: {csv_path}...")
-    df = pd.read_csv(csv_path)
-    
-    # Ensure column order: Drop 'Type' and use the rest as features
-    # This matches the extract_features order in preprocess.py
-    X = df.drop('Type', axis=1).values
-    y = df['Type'].values.reshape(-1, 1)
-    
-    print(f"[Sentinel] Features: {X.shape[1]}, Instances: {len(X)}")
+# New local paths
+features_csv_path = './datasets/extracted_features.csv'
+model_save_path = './models/phishing_sentinel_model.pkl'
 
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    
-    model_dir = "models"
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
-    
-    # Save Scaler
-    joblib.dump(scaler, os.path.join(model_dir, "scaler.pkl"))
+print("Loading extracted features from Google Drive...")
+# Read the CSV we generated in the last step
+df = pd.read_csv(features_csv_path)
 
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
-    
-    train_data = TensorDataset(torch.FloatTensor(X_train), torch.FloatTensor(y_train))
-    test_data = TensorDataset(torch.FloatTensor(X_test), torch.FloatTensor(y_test))
-    
-    train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
-    test_loader = DataLoader(test_data, batch_size=64, shuffle=False)
+# Separate features (X) and labels (y)
+X = df.drop('label', axis=1)
+y = df['label']
 
-    model = PhishingSentinelModel(input_size=X.shape[1])
-    criterion = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+print("Splitting dataset into training and testing sets...")
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    print(f"[Sentinel] Starting Training...")
-    for epoch in range(30):
-        model.train()
-        for batch_X, batch_y in train_loader:
-            optimizer.zero_grad()
-            outputs = model(batch_X)
-            loss = criterion(outputs, batch_y)
-            loss.backward()
-            optimizer.step()
-            
-        if (epoch + 1) % 5 == 0:
-            model.eval()
-            with torch.no_grad():
-                correct = 0
-                total = 0
-                for tx, ty in test_loader:
-                    t_out = model(tx)
-                    predicted = (t_out > 0.5).float()
-                    total += ty.size(0)
-                    correct += (predicted == ty).sum().item()
-                print(f"Epoch [{epoch+1}/30], Accuracy: {100 * correct / total:.2f}%")
-            
-    torch.save(model.state_dict(), os.path.join(model_dir, "sentinel_v1.pth"))
-    print(f"[Sentinel] Model training complete.")
+print("Training the Random Forest Classifier...")
+print("Executing... you can safely step away while this runs.")
 
-if __name__ == "__main__":
-    train_model()
+# n_jobs=-1 uses all available processor cores in Colab to speed up training
+clf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+clf.fit(X_train, y_train)
+
+print("\n--- Training Complete! ---")
+print("Evaluating model...")
+y_pred = clf.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred) * 100
+print(f"Accuracy: {accuracy:.2f}%\n")
+print(classification_report(y_test, y_pred))
+
+print(f"Saving the final model directly to Drive...")
+joblib.dump(clf, model_save_path)
+
+elapsed_time = (time.time() - start_time) / 60
+print(f"All done! Total execution time: {elapsed_time:.2f} minutes.")
+print("Model safely saved to your local models folder.")
+
+"""Loading extracted features from Google Drive...
+Splitting dataset into training and testing sets...
+Training the Random Forest Classifier...
+Executing... you can safely step away while this runs.
+
+--- Training Complete! ---
+Evaluating model...
+Accuracy: 86.78%
+
+              precision    recall  f1-score   support
+
+           0       0.89      0.90      0.89      9910
+           1       0.83      0.81      0.82      6042
+
+    accuracy                           0.87     15952
+   macro avg       0.86      0.86      0.86     15952
+weighted avg       0.87      0.87      0.87     15952
+
+Saving the final model directly to Drive...
+All done! Total execution time: 0.19 minutes.
+Model safely saved to your Google Drive. Have a good night!"""
