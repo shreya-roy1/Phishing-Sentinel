@@ -111,7 +111,7 @@ function Dashboard() {
                   <td colSpan="5" className="px-6 py-12 text-center text-slate-500 italic">No scan data received yet.</td>
                 </tr>
               ) : (
-                recentEvents.map((event) => (
+                recentEvents?.map((event) => (
                   <tr key={event.id} className="hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs text-slate-300 max-w-md truncate">{event.url}</td>
                     <td className="px-6 py-4">
