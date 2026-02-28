@@ -15,7 +15,7 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8080/login', {
+      const response = await fetch('https://phishing-sentinel.onrender.com/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -27,7 +27,7 @@ const Login = () => {
         localStorage.setItem('sentinel_token', data.token);
 
     // Get your Extension ID from chrome://extensions
-    const SENTINEL_EXT_ID = "jlhddlkhohfggefbglbheonnaclgipei";// "YOUR_EXTENSION_ID_HERE"; 
+    const SENTINEL_EXT_ID = "kpjdneilodflodgafamgghjkjjjphhhe";//jlhddlkhohfggefbglbheonnaclgipei";// "YOUR_EXTENSION_ID_HERE"; 
 
     if (window.chrome && chrome.runtime) {
         chrome.runtime.sendMessage(SENTINEL_EXT_ID, {
